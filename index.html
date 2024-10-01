@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Patient Information and Encounters</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 20px;
+        }
+        header {
+            text-align: center;
+            padding: 10px 0;
+            background-color: #007bff;
+            color: white;
+        }
+        .container {
+            max-width: 900px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: white;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .patient-count {
+            font-size: 24px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #007bff;
+            color: white;
+        }
+        .loading {
+            text-align: center;
+            font-size: 20px;
+            color: #007bff;
+        }
+        .error {
+            color: red;
+            text-align: center;
+        }
+        .encounters-table {
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Patient Information and Encounters</h1>
+</header>
+
+<div class="container">
+    <div id="patientCount" class="patient-count">Loading...</div>
+    <table id="patientTable" style="display:none;">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Id</th>
+                <th>Full Name</th>
+                <th>Phone</th>
+                <th>Gender</th>
+                <th>Date of Birth</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="patientBody"></tbody>
+    </table>
+    <div id="error" class="error"></div>
+</div>
+
+<!-- Encounter details section -->
+<div class="container" id="encounterSection" style="display:none;">
+    <h2 id="encounterTitle">Encounters for </h2>
+    <table id="encounterTable">
+        <thead>
+            <tr>
+                <th>Service Provider</th>
+                <th>Reason</th>
+                <th>Doctor</th>
+                <th>Location</th>
+                <th>Start</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="encounterBody"></tbody>
+    </table>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        fetchPatientData();
+    });
+
+    function fetchPatientData() {
+        const url = 'https://fhir-open.cerner.com/r4/ec2458f2-1e24-41c8-b71b-0e701af7583d/Patient?family=Hplx';
+        const options = {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/fhir+json'
+            }
+        };
+
+        fetch(url, options)
+            .then(response => response.json())
+            .then(data => {
+                if (data.total && data.entry) {
+                    document.getElementById('patientCount').innerHTML = `Total Patients: ${data.total}`;
+                    const tbody = document.getElementById('patientBody');
+                    data.entry.forEach((entry, index) => {
+                        const resource = entry.resource;
+                        const patId = resource.id || 'N/A';
+                        const fullName = resource.name?.[0]?.text || 'N/A';
+                        const phone = resource.telecom?.[0]?.extension?.[0]?.valueUrl || 'N/A';
+                        const gender = resource.gender || 'N/A';
+                        const dob = resource.birthDate || 'N/A';
+                        const patientId = resource.id;
+
+                        const row = `
+                            <tr>
+                                <td>${index + 1}</td>
+                                <td>${patId}</td>
+                                <td>${fullName}</td>
+                                <td>${phone}</td>
+                                <td>${gender}</td>
+                                <td>${dob}</td>
+                                <td><button onclick="showEncounters('${fullName}', '${patientId}')">Show Encounters</button></td>
+                            </tr>
+                        `;
+                        tbody.innerHTML += row;
+                    });
+                    document.getElementById('patientTable').style.display = 'table';
+                } else {
+                    document.getElementById('error').textContent = 'No patients found.';
+                }
+            })
+            .catch(error => {
+                document.getElementById('error').textContent = 'Error fetching patient data: ' + error;
+            });
+    }
+
+    function showEncounters(patientName, patientId) {
+        const encounterUrl = `https://fhir-open.cerner.com/r4/ec2458f2-1e24-41c8-b71b-0e701af7583d/Encounter?patient=${patientId}`;
+        const options = {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/fhir+json'
+            }
+        };
+
+        fetch(encounterUrl, options)
+            .then(response => response.json())
+            .then(data => {
+                if (data.entry) {
+                    document.getElementById('encounterTitle').textContent = `Encounters for ${patientName}`;
+                    const tbody = document.getElementById('encounterBody');
+                    tbody.innerHTML = ''; // Clear previous encounters
+                    data.entry.forEach((entry, index) => {
+                        const resource = entry.resource;
+                        const serviceProvider = resource.serviceProvider?.display || 'N/A';
+                        const reason = resource.reasonCode?.[0]?.text || ' ';
+                        const doctor = resource.participant?.[0]?.individual?.display || 'N/A';
+                        const location = resource.location?.[0]?.location?.display || 'N/A';
+                        const start = resource.period?.start || 'N/A';
+
+                        const row = `
+                            <tr>
+                                <td>${serviceProvider}</td>
+                                <td>${reason}</td>
+                                <td>${doctor}</td>
+                                <td>${location}</td>
+                                <td>${start}</td>
+                                <td><button>Show Documents</button></td>
+                            </tr>
+                        `;
+                        tbody.innerHTML += row;
+                    });
+                    document.getElementById('encounterSection').style.display = 'block';
+                } else {
+                    alert('No encounters found for this patient.');
+                }
+            })
+            .catch(error => {
+                alert('Error fetching encounter data: ' + error);
+            });
+    }
+</script>
+
+</body>
+</html>
