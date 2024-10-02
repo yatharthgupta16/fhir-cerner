@@ -119,8 +119,9 @@
         fetch(url, options)
             .then(response => response.json())
             .then(data => {
-                if (data.total && data.entry) {
-                    document.getElementById('patientCount').innerHTML = `Total Patients: ${data.total}`;
+                const total_pat = data.total || 'NA';
+                if (data.entry) {
+                    document.getElementById('patientCount').innerHTML = `Total Patients: ${total_pat}`;
                     const tbody = document.getElementById('patientBody');
                     data.entry.forEach((entry, index) => {
                         const resource = entry.resource;
